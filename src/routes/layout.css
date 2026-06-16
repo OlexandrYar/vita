@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+:root {
+	--bg: #f4efe4;
+	--card: #fffdf5;
+	--border: #c8b99a;
+	--header: #2c4a2c;
+	--nav: #3d6b3d;
+	--accent-green: #4a7a4a;
+	--accent-brown: #8b6914;
+	--text: #2d1f0e;
+	--text-muted: #6b5a3e;
+	--shadow: rgba(60, 40, 10, 0.14);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background-color: var(--bg);
+	color: var(--text);
+	font-family: 'Lora', Georgia, 'Times New Roman', serif;
+	min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+	font-family: 'Playfair Display', Georgia, serif;
+}
+
+button {
+	cursor: pointer;
+	font-family: 'Lora', Georgia, serif;
+}
+
+input,
+textarea {
+	font-family: 'Lora', Georgia, serif;
+}
