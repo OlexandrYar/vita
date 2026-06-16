@@ -1,5 +1,6 @@
 <script>
 	import { plantsStore } from './plants.svelte.js';
+	import { speak } from './speech.js';
 
 	let started = $state(false);
 	let finished = $state(false);
@@ -159,7 +160,15 @@
 						<div class="back-deco">❧</div>
 						<h3 class="back-name">{current.name}</h3>
 						{#if current.latinName}
-							<p class="back-latin">{current.latinName}</p>
+							<div class="back-latin-row">
+								<p class="back-latin">{current.latinName}</p>
+								<button
+									class="btn-speak"
+									onclick={(e) => { e.stopPropagation(); speak(current.latinName ?? ''); }}
+									title="Вимовити"
+									aria-label="Вимовити латинську назву"
+								>🔊</button>
+							</div>
 						{/if}
 						<p class="back-sub">Назва рослини</p>
 					</div>
@@ -489,12 +498,41 @@
 		line-height: 1.35;
 	}
 
+	.back-latin-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+	}
+
 	.back-latin {
 		font-style: italic;
 		font-size: 1rem;
 		color: var(--text-muted);
-		margin-bottom: 0.75rem;
 		text-align: center;
+		margin: 0;
+	}
+
+	.btn-speak {
+		flex-shrink: 0;
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 50%;
+		width: 30px;
+		height: 30px;
+		font-size: 0.8rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		color: var(--text-muted);
+		transition: background-color 0.15s, border-color 0.15s;
+		line-height: 1;
+	}
+
+	.btn-speak:hover {
+		background: #f0e8d0;
+		border-color: var(--accent-brown);
 	}
 
 	.back-sub {

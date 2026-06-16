@@ -1,5 +1,6 @@
 <script>
 	import { plantsStore } from './plants.svelte.js';
+	import { speak } from './speech.js';
 
 	/** @typedef {import('./plants.svelte.js').Plant} Plant */
 
@@ -145,6 +146,15 @@
 						title="Видалити"
 						aria-label="Видалити {plant.name}"
 					>✕</button>
+
+					{#if plant.latinName}
+						<button
+							class="card-btn speak-btn"
+							onclick={(e) => { e.stopPropagation(); speak(plant.latinName ?? ''); }}
+							title="Вимовити латинську назву"
+							aria-label="Вимовити {plant.latinName}"
+						>🔊</button>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -437,6 +447,17 @@
 
 	.delete-btn:hover {
 		background: #8b2e23;
+	}
+
+	.speak-btn {
+		bottom: -10px;
+		right: -10px;
+		background: var(--accent-brown);
+		font-size: 0.75rem;
+	}
+
+	.speak-btn:hover {
+		background: #8b6a30;
 	}
 
 	/* ── Modal shared ────────────────────────────────────────────────────── */
