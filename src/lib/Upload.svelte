@@ -1,4 +1,5 @@
 <script>
+	import { onMount, onDestroy } from 'svelte';
 	import { plantsStore } from './plants.svelte.js';
 
 	let name = $state('');
@@ -13,6 +14,26 @@
 	let error = $state('');
 	/** @type {HTMLInputElement | null} */
 	let fileInput = $state(null);
+
+	/** @param {ClipboardEvent} e */
+	function handlePaste(e) {
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of items) {
+			if (item.type.startsWith('image/')) {
+				handleFile(item.getAsFile());
+				break;
+			}
+		}
+	}
+
+	onMount(() => {
+		window.addEventListener('paste', handlePaste);
+	});
+
+	onDestroy(() => {
+		window.removeEventListener('paste', handlePaste);
+	});
 
 	/** @param {File | null | undefined} file */
 	function handleFile(file) {
@@ -96,7 +117,7 @@
 				<div class="drop-content">
 					<div class="drop-icon">❧</div>
 					<p class="drop-text">Перетягніть фото сюди</p>
-					<p class="drop-sub">або натисніть для вибору</p>
+					<p class="drop-sub">або натисніть для вибору / вставте Ctrl+V</p>
 				</div>
 			{/if}
 		</div>
