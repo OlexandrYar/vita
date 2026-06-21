@@ -1,23 +1,79 @@
 <script>
 	import { plantsStore } from './plants.svelte.js';
 	import { speak } from './speech.js';
+	import { SvelteSet } from 'svelte/reactivity';
+
+	/** @typedef {import('./plants.svelte.js').Plant} Plant */
 
 	let started = $state(false);
 	let finished = $state(false);
-	let count = $state(1);
-	/** @type {import('./plants.svelte.js').Plant[]} */
+	/** @type {Plant[]} */
 	let deck = $state([]);
 	let currentIndex = $state(0);
 	let flipped = $state(false);
 
+	/** @type {'number' | 'name'} */
+	let sortMode = $state('number');
+	let doShuffle = $state(true);
+	/** Selected plant ids. @type {SvelteSet<number>} */
+	const selected = new SvelteSet();
+	let initialized = false;
+
+	/** Витягує номер з початку української назви, напр. "31 Орхідея" → 31. @param {string} name */
+	function plantNumber(name) {
+		const m = name.match(/^\s*(\d+)/);
+		return m ? parseInt(m[1], 10) : null;
+	}
+
+	/** Назва без числового префікса для сортування за алфавітом. @param {string} name */
+	function stripNumber(name) {
+		return name.replace(/^\s*\d+\s*/, '').trim() || name;
+	}
+
+	let sortedList = $derived.by(() => {
+		const arr = [...plantsStore.list];
+		if (sortMode === 'number') {
+			arr.sort((a, b) => {
+				const na = plantNumber(a.name);
+				const nb = plantNumber(b.name);
+				if (na === null && nb === null) return a.name.localeCompare(b.name, 'uk');
+				if (na === null) return 1;
+				if (nb === null) return -1;
+				return na - nb;
+			});
+		} else {
+			arr.sort((a, b) => stripNumber(a.name).localeCompare(stripNumber(b.name), 'uk'));
+		}
+		return arr;
+	});
+
+	let selectedCount = $derived(sortedList.filter((p) => selected.has(p.id)).length);
+	let allSelected = $derived(sortedList.length > 0 && selectedCount === sortedList.length);
+
+	// За замовчуванням позначаємо всі рослини, коли список завантажився.
 	$effect(() => {
-		const len = plantsStore.list.length;
-		if (!started) {
-			count = len;
+		const ids = plantsStore.list.map((p) => p.id);
+		if (!started && !initialized && ids.length) {
+			for (const id of ids) selected.add(id);
+			initialized = true;
 		}
 	});
 
-	/** @param {import('./plants.svelte.js').Plant[]} arr */
+	/** @param {number} id */
+	function toggle(id) {
+		if (selected.has(id)) selected.delete(id);
+		else selected.add(id);
+	}
+
+	function selectAll() {
+		for (const p of sortedList) selected.add(p.id);
+	}
+
+	function clearAll() {
+		selected.clear();
+	}
+
+	/** @param {Plant[]} arr */
 	function shuffle(arr) {
 		const a = [...arr];
 		for (let i = a.length - 1; i > 0; i--) {
@@ -28,7 +84,9 @@
 	}
 
 	function start() {
-		deck = shuffle(plantsStore.list).slice(0, count);
+		const chosen = sortedList.filter((p) => selected.has(p.id));
+		if (chosen.length === 0) return;
+		deck = doShuffle ? shuffle(chosen) : chosen;
 		currentIndex = 0;
 		flipped = false;
 		started = true;
@@ -62,6 +120,12 @@
 	let current = $derived(deck[currentIndex]);
 	let maxCount = $derived(plantsStore.list.length);
 
+	/** @param {string} name */
+	function displayNumber(name) {
+		const n = plantNumber(name);
+		return n === null ? '·' : n;
+	}
+
 	/** @param {number} n */
 	function pluralRoslyn(n) {
 		if (n === 1) return '1 рослину';
@@ -86,39 +150,65 @@
 			</div>
 
 			<div class="setup-card">
-				<p class="setup-desc">Оберіть кількість карток для сесії</p>
+				<p class="setup-desc">Оберіть рослини та порядок для сесії</p>
 
-				<div class="count-display">
-					<span class="count-num">{count}</span>
-					{#if count === maxCount}
-						<span class="count-all">всі рослини</span>
-					{:else}
-						<span class="count-all">{count === 1 ? 'рослина' : count <= 4 ? 'рослини' : 'рослин'}</span>
-					{/if}
+				<!-- Сортування -->
+				<div class="sort-row">
+					<span class="sort-label">Сортувати</span>
+					<div class="segmented">
+						<button
+							class="seg"
+							class:active={sortMode === 'number'}
+							onclick={() => (sortMode = 'number')}
+						>За номером</button>
+						<button
+							class="seg"
+							class:active={sortMode === 'name'}
+							onclick={() => (sortMode = 'name')}
+						>За назвою</button>
+					</div>
 				</div>
 
-				<div class="slider-wrap">
-					<span class="edge">1</span>
-					<input
-						type="range"
-						min="1"
-						max={maxCount}
-						bind:value={count}
-						class="slider"
-					/>
-					<span class="edge">{maxCount}</span>
+				<!-- Панель вибору -->
+				<div class="select-bar">
+					<span class="select-count">Вибрано {selectedCount} з {maxCount}</span>
+					<button class="link-btn" onclick={allSelected ? clearAll : selectAll}>
+						{allSelected ? 'Зняти всі' : 'Вибрати всі'}
+					</button>
 				</div>
 
-				<div class="presets">
-					{#each [5, 10, 20] as n}
-						{#if maxCount >= n}
-							<button class="preset" onclick={() => (count = n)}>{n}</button>
-						{/if}
+				<!-- Список рослин -->
+				<ul class="plant-list">
+					{#each sortedList as plant (plant.id)}
+						<li>
+							<label class="plant-row" class:checked={selected.has(plant.id)}>
+								<input
+									type="checkbox"
+									checked={selected.has(plant.id)}
+									onchange={() => toggle(plant.id)}
+								/>
+								<span class="row-check" aria-hidden="true"></span>
+								<span class="row-num">{displayNumber(plant.name)}</span>
+								<img class="row-thumb" src={plant.imageUrl} alt="" />
+								<span class="row-name">
+									{plant.name}
+									{#if plant.latinName}<em class="row-latin">{plant.latinName}</em>{/if}
+								</span>
+							</label>
+						</li>
 					{/each}
-					<button class="preset all-preset" onclick={() => (count = maxCount)}>Всі</button>
-				</div>
+				</ul>
 
-				<button onclick={start} class="btn-start">Перемішати та почати</button>
+				<!-- Перемішати -->
+				<label class="shuffle-row">
+					<input type="checkbox" bind:checked={doShuffle} />
+					<span class="row-check" aria-hidden="true"></span>
+					<span>Перемішати картки</span>
+				</label>
+
+				<button onclick={start} class="btn-start" disabled={selectedCount === 0}>
+					{doShuffle ? 'Перемішати та почати' : 'Почати'}
+				</button>
 			</div>
 		</div>
 	{:else if finished}
@@ -255,72 +345,191 @@
 		margin-bottom: 1.75rem;
 	}
 
-	.count-display {
-		text-align: center;
-		margin-bottom: 1.25rem;
-		line-height: 1;
-	}
-
-	.count-num {
-		display: block;
-		font-size: 4rem;
-		font-family: 'Playfair Display', serif;
-		font-weight: 700;
-		color: var(--header);
-	}
-
-	.count-all {
-		display: block;
-		font-size: 0.85rem;
-		color: var(--text-muted);
-		margin-top: 0.2rem;
-		font-style: italic;
-	}
-
-	.slider-wrap {
+	/* Сортування */
+	.sort-row {
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
 		gap: 0.75rem;
-		margin-bottom: 1.5rem;
-	}
-
-	.edge {
-		font-size: 0.8rem;
-		color: var(--text-muted);
-		min-width: 1.25rem;
-		text-align: center;
-	}
-
-	.slider {
-		flex: 1;
-		accent-color: var(--accent-green);
-		height: 5px;
-		cursor: pointer;
-	}
-
-	.presets {
-		display: flex;
-		gap: 0.5rem;
-		justify-content: center;
-		margin-bottom: 2rem;
+		margin-bottom: 1.25rem;
 		flex-wrap: wrap;
 	}
 
-	.preset {
-		padding: 0.35rem 1rem;
+	.sort-label {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--text-muted);
+	}
+
+	.segmented {
+		display: flex;
 		border: 1px solid var(--border);
 		border-radius: 20px;
+		overflow: hidden;
+	}
+
+	.seg {
+		padding: 0.4rem 1rem;
 		background: none;
+		border: none;
 		color: var(--text-muted);
 		font-size: 0.85rem;
+		cursor: pointer;
 		transition: all 0.15s;
 	}
 
-	.preset:hover,
-	.all-preset {
+	.seg.active {
 		background: var(--header);
 		color: #f0e8d0;
-		border-color: var(--header);
+	}
+
+	/* Панель вибору */
+	.select-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
+	}
+
+	.select-count {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		font-style: italic;
+	}
+
+	.link-btn {
+		background: none;
+		border: none;
+		color: var(--accent-green);
+		font-size: 0.85rem;
+		cursor: pointer;
+		padding: 0.2rem 0.3rem;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.link-btn:hover {
+		color: var(--header);
+	}
+
+	/* Список рослин */
+	.plant-list {
+		list-style: none;
+		margin: 0 0 1.25rem;
+		padding: 0.3rem;
+		max-height: 340px;
+		overflow-y: auto;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.4);
+	}
+
+	.plant-row {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		padding: 0.45rem 0.55rem;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background-color 0.15s;
+	}
+
+	.plant-row:hover {
+		background: #f0e8d0;
+	}
+
+	.plant-row.checked {
+		background: rgba(74, 122, 74, 0.1);
+	}
+
+	.plant-row input,
+	.shuffle-row input {
+		position: absolute;
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+
+	.row-check {
+		flex-shrink: 0;
+		width: 18px;
+		height: 18px;
+		border: 1.5px solid var(--border);
+		border-radius: 4px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background: white;
+		transition: all 0.15s;
+	}
+
+	.plant-row.checked .row-check,
+	.shuffle-row input:checked + .row-check {
+		background: var(--accent-green);
+		border-color: var(--accent-green);
+	}
+
+	.plant-row.checked .row-check::after,
+	.shuffle-row input:checked + .row-check::after {
+		content: '✓';
+		color: white;
+		font-size: 0.75rem;
+		line-height: 1;
+	}
+
+	.row-num {
+		flex-shrink: 0;
+		min-width: 1.75rem;
+		text-align: center;
+		font-family: 'Playfair Display', serif;
+		font-weight: 700;
+		font-size: 0.9rem;
+		color: var(--accent-brown);
+	}
+
+	.row-thumb {
+		flex-shrink: 0;
+		width: 38px;
+		height: 38px;
+		object-fit: cover;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+	}
+
+	.row-name {
+		font-family: 'Lora', serif;
+		font-size: 0.9rem;
+		color: var(--text);
+		line-height: 1.3;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.row-latin {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	/* Перемішати */
+	.shuffle-row {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		margin-bottom: 1.5rem;
+		cursor: pointer;
+		font-size: 0.9rem;
+		color: var(--text);
+		position: relative;
+	}
+
+	.btn-start:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	.btn-start:disabled:hover {
+		background: var(--header);
 	}
 
 	.btn-start {
