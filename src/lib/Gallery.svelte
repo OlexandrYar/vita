@@ -89,6 +89,38 @@
 		}
 	}
 
+	// ── Сортування ──────────────────────────────────────────────────────────
+	/** @type {'number' | 'name'} */
+	let sortMode = $state('number');
+
+	/** Витягує номер з початку української назви, напр. "31 Орхідея" → 31. @param {string} name */
+	function plantNumber(name) {
+		const m = name.match(/^\s*(\d+)/);
+		return m ? parseInt(m[1], 10) : null;
+	}
+
+	/** Назва без числового префікса для сортування за алфавітом. @param {string} name */
+	function stripNumber(name) {
+		return name.replace(/^\s*\d+\s*/, '').trim() || name;
+	}
+
+	let sortedList = $derived.by(() => {
+		const arr = [...plantsStore.list];
+		if (sortMode === 'number') {
+			arr.sort((a, b) => {
+				const na = plantNumber(a.name);
+				const nb = plantNumber(b.name);
+				if (na === null && nb === null) return a.name.localeCompare(b.name, 'uk');
+				if (na === null) return 1;
+				if (nb === null) return -1;
+				return na - nb;
+			});
+		} else {
+			arr.sort((a, b) => stripNumber(a.name).localeCompare(stripNumber(b.name), 'uk'));
+		}
+		return arr;
+	});
+
 	// ── Helpers ─────────────────────────────────────────────────────────────
 	/** @param {number} id */
 	function tilt(id) {
@@ -119,8 +151,24 @@
 			<p class="empty-sub">Додайте першу рослину, щоб почати збирати колекцію</p>
 		</div>
 	{:else}
+		<div class="sort-row">
+			<span class="sort-label">Сортувати</span>
+			<div class="segmented">
+				<button
+					class="seg"
+					class:active={sortMode === 'number'}
+					onclick={() => (sortMode = 'number')}
+				>За номером</button>
+				<button
+					class="seg"
+					class:active={sortMode === 'name'}
+					onclick={() => (sortMode = 'name')}
+				>За назвою</button>
+			</div>
+		</div>
+
 		<div class="grid">
-			{#each plantsStore.list as plant (plant.id)}
+			{#each sortedList as plant (plant.id)}
 				<div class="plant-card" style="--rot: {tilt(plant.id)}deg">
 					<div class="card-img-wrap">
 						<img src={plant.imageUrl} alt={plant.name} class="card-img" />
@@ -313,6 +361,45 @@
 		max-width: 280px;
 		margin: 0 auto;
 		line-height: 1.6;
+	}
+
+	/* ── Сортування ──────────────────────────────────────────────────────── */
+	.sort-row {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		margin-bottom: 1.75rem;
+		flex-wrap: wrap;
+	}
+
+	.sort-label {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--text-muted);
+	}
+
+	.segmented {
+		display: flex;
+		border: 1px solid var(--border);
+		border-radius: 20px;
+		overflow: hidden;
+	}
+
+	.seg {
+		padding: 0.4rem 1rem;
+		background: none;
+		border: none;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.seg.active {
+		background: var(--header);
+		color: #f0e8d0;
 	}
 
 	/* ── Grid ────────────────────────────────────────────────────────────── */
